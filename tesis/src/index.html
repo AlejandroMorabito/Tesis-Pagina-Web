@@ -6,6 +6,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VenIoT — Dashboard de Alarmas</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* === Logos VenIoT === */
+    .veniot-login-logo { text-align: center; margin-bottom: 6px; }
+    .veniot-login-logo img { width: 190px; max-width: 72%; height: auto; }
+    /* Logo más grande, centrado dentro de la barra (56px) sin desbordarse */
+    .veniot-topbar-logo { height: 50px; width: auto; }
+    /* Mostrar el logo según el tema: blanco en oscuro, negro en claro */
+    .veniot-login-logo .logo-light,
+    .user-bar-left .logo-light { display: none; }
+    .veniot-login-logo .logo-dark,
+    .user-bar-left .logo-dark { display: inline-block; }
+    [data-theme="light"] .veniot-login-logo .logo-dark,
+    [data-theme="light"] .user-bar-left .logo-dark { display: none; }
+    [data-theme="light"] .veniot-login-logo .logo-light,
+    [data-theme="light"] .user-bar-left .logo-light { display: inline-block; }
+  </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -25,12 +41,10 @@
     </div>
 
     <div class="login-card">
-      <div class="sismo-logo-big">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7z"/>
-        </svg>
+      <div class="veniot-login-logo">
+        <img class="logo-dark" src="logos/veniot-centered-dark.png" alt="VenIoT">
+        <img class="logo-light" src="logos/veniot-centered-light.png" alt="VenIoT">
       </div>
-      <h1>VenIoT</h1>
       <p class="login-subtitle">Security Dashboard — Acceso Seguro</p>
 
       <form id="login-form">
@@ -77,12 +91,8 @@
     <!-- Barra superior -->
     <div class="user-bar">
       <div class="user-bar-left">
-        <div class="sismo-logo">
-          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7z"/>
-          </svg>
-        </div>
-        <span class="sismo-brand">VenIoT</span>
+        <img class="veniot-topbar-logo logo-dark" src="logos/veniot-inline-dark.png" alt="VenIoT">
+        <img class="veniot-topbar-logo logo-light" src="logos/veniot-inline-light.png" alt="VenIoT">
         <span class="sismo-subtitle">Security Dashboard</span>
       </div>
       <div class="user-bar-right">
