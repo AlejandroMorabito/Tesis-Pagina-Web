@@ -463,7 +463,7 @@ function startRealtimeListeners() {
         alarm: deviceData.state.alarm_active || false,
         armed: deviceData.state.system_armed || false,
         intrusion: deviceData.state.any_intrusion || false,
-        lastSeen: deviceData.last_seen || Date.now(),
+        lastSeen: toMillis(deviceData.last_seen),
         rssi: deviceData.rssi || -90,
         ip: deviceData.ip_address || "N/A",
         mac: deviceData.mac_address || "N/A",
@@ -531,7 +531,7 @@ function startRealtimeListeners() {
                 alarm: deviceData.state.alarm_active || false,
                 armed: deviceData.state.system_armed || false,
                 intrusion: deviceData.state.any_intrusion || false,
-                lastSeen: deviceData.last_seen || Date.now(),
+                lastSeen: toMillis(deviceData.last_seen),
                 rssi: deviceData.rssi || -90,
                 ip: deviceData.ip_address || "N/A",
                 mac: deviceData.mac_address || "N/A",
@@ -2097,6 +2097,15 @@ function closeUserProfileModal() {
 }
 
 // Formatear timestamp
+// El ESP32 escribe last_seen en SEGUNDOS (Unix epoch). Date.now() está en
+// milisegundos, así que hay que normalizar antes de comparar, o todo sale
+// "Desconectado". Devuelve 0 si no hay dato.
+function toMillis(ts) {
+  const n = Number(ts);
+  if (!n || isNaN(n) || n <= 0) return 0;
+  return n > 1000000000000 ? n : n * 1000;
+}
+
 function formatTimestamp(timestamp) {
   if (!timestamp) return "Reciente";
 
@@ -2365,7 +2374,7 @@ async function loadDevicesState() {
           alarm: device.state?.alarm_active || false,
           armed: device.state?.system_armed || false,
           intrusion: device.state?.any_intrusion || false,
-          lastSeen: device.last_seen || Date.now(),
+          lastSeen: toMillis(device.last_seen),
           rssi: device.rssi || -90,
           ip: device.ip_address || "N/A",
           mac: device.mac_address || "N/A",
@@ -2507,6 +2516,7 @@ function updateUI() {
   updateDashboard();
   updateValoresEnVivo();
   updateSidebarStatus();
+  updateControlCercos(); // refresca el modal de control si está abierto
 }
 
 // Actualizar indicador de estado en el sidebar
@@ -2719,7 +2729,7 @@ function updateDashboard() {
       }
  
       const sensoresActivosChip = [1,2,3,4,5].filter(i => sensors[`c${i}`]).length;
-      const ultimaConexion = device.lastSeen || Date.now();
+      const ultimaConexion = device.lastSeen || 0;
       const conectado = (ahora - ultimaConexion) < 300000;
       const ledClass = conectado ? 'online' : ((ahora - ultimaConexion) < 600000 ? 'intermittent' : 'offline');
       const ledText = conectado ? 'Conectado' : ((ahora - ultimaConexion) < 600000 ? 'Intermitente' : 'Desconectado');
@@ -3472,10 +3482,10 @@ function closeControlModal() {
 }
 
 function updateControlCercos() {
-  // Esta función ya NO se usa, pero la mantenemos para evitar errores
-  console.log(
-    "ℹ️ updateControlCercos está desactivada - usando showSingleChipControl"
-  );
+  const modal = document.getElementById("control-modal");
+  // Solo refrescar si el modal YA está abierto (si no, lo abriría sin querer)
+  if (!modal || modal.style.display !== "block" || !selectedChipId) return;
+  showSingleChipControl(selectedChipId);
 }
 
 // ==================== ENVIAR COMANDOS ====================
