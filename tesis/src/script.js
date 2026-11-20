@@ -475,10 +475,9 @@ function startRealtimeListeners() {
         if (!sensorStates[chipId]) {
           sensorStates[chipId] = {};
         }
-        sensorStates[chipId] = {
-          ...sensorStates[chipId],
-          ...deviceData.sensors
-        };
+        // Reemplazar (no fusionar): si se fusiona, una clave vieja como
+        // "alarma" sobrevive para siempre y provoca alarmas fantasma.
+        sensorStates[chipId] = { ...deviceData.sensors };
       }
 
       // Mostrar notificación de cambio si es importante
@@ -2097,13 +2096,21 @@ function closeUserProfileModal() {
 }
 
 // Formatear timestamp
-// El ESP32 escribe last_seen en SEGUNDOS (Unix epoch). Date.now() está en
-// milisegundos, así que hay que normalizar antes de comparar, o todo sale
-// "Desconectado". Devuelve 0 si no hay dato.
+// El firmware calcula last_seen como epoch en milisegundos dentro de un
+// unsigned long de 32 bits, así que el valor llega DESBORDADO: es la hora real
+// módulo 2^32 (un ciclo de ~49,7 días). Se reconstruye la hora real como el
+// instante más reciente (<= ahora) que coincide con ese valor.
+// Devuelve 0 si no hay dato.
 function toMillis(ts) {
   const n = Number(ts);
   if (!n || isNaN(n) || n <= 0) return 0;
-  return n > 1000000000000 ? n : n * 1000;
+  if (n > 1000000000000) return n; // ya es un epoch en ms válido
+  const WRAP = 4294967296; // 2^32
+  const now = Date.now();
+  let age = (((now - n) % WRAP) + WRAP) % WRAP;
+  // Reloj del nodo ligeramente adelantado al del navegador: tratar como "ahora"
+  if (age > WRAP - 120000) age = 0;
+  return now - age;
 }
 
 function formatTimestamp(timestamp) {
@@ -2284,8 +2291,9 @@ async function loadAlarmData(loadMore = false) {
     // Actualizar currentData basado en showAllEvents
     updateCurrentDataFromAllEvents();
 
-    // Actualizar estados de sensores
-    updateSensorStatesFromEvents(currentData);
+    // El estado de las zonas sale SOLO de /devices (estado real del nodo).
+    // Antes se reconstruía aquí desde el historial de eventos, lo que pisaba
+    // el estado real con eventos viejos cada 15 s (zonas que "parpadeaban").
 
     // Actualizar UI
     updateUI();
@@ -2386,10 +2394,7 @@ async function loadDevicesState() {
           if (!sensorStates[chipId]) {
             sensorStates[chipId] = {};
           }
-          sensorStates[chipId] = {
-            ...sensorStates[chipId],
-            ...device.sensors
-          };
+          sensorStates[chipId] = { ...device.sensors };
         }
       }
     }
@@ -2717,7 +2722,7 @@ function updateDashboard() {
       if (device.alarm) {
         estado = "Alarma";
         statusClass = "alarm";
-      } else if (device.intrusion) {
+      } else if (device.intrusion || [1, 2, 3, 4, 5].some((i) => sensors[`c${i}`])) {
         estado = "Intrusión";
         statusClass = "intrusion";
       } else if (device.armed) {
@@ -3123,7 +3128,8 @@ function updateValoresEnVivo() {
     let statusDesc = "Estado no disponible";
 
     const hasActiveSensors = sensors.c1 || sensors.c2 || sensors.c3 || sensors.c4 || sensors.c5;
-    const hasAlarm = sensors.alarma || device.alarm;
+    // Estado autoritativo del firmware (state.*), igual que el modal.
+    const hasAlarm = device.alarm;
 
     if (hasAlarm) {
       statusColor = "var(--red)";
@@ -3131,13 +3137,13 @@ function updateValoresEnVivo() {
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
       statusText = "ALARMA ACTIVA";
       statusDesc = "¡Se requiere atención inmediata!";
-    } else if (hasActiveSensors) {
+    } else if (device.intrusion || hasActiveSensors) {
       statusColor = "var(--amber)";
       statusRawColor = "#f59e0b";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
       statusText = "INTRUSIÓN";
       statusDesc = "Intrusión detectada";
-    } else if (sensors.armado || device.armed) {
+    } else if (device.armed) {
       statusColor = "var(--green)";
       statusRawColor = "#22c55e";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7z"/></svg>';
@@ -3149,6 +3155,18 @@ function updateValoresEnVivo() {
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 019.9-1"/></svg>';
       statusText = "DESARMADO";
       statusDesc = "Sistema inactivo";
+    }
+
+    // Un nodo sin conexión no reporta nada: su último estado quedó congelado
+    // (con INPUT_PULLUP las entradas al aire se leen como intrusión). No hay
+    // que mostrarlo como si estuviera pasando ahora.
+    const isOnline = !!device.lastSeen && (Date.now() - device.lastSeen) < 300000;
+    if (!isOnline) {
+      statusDesc = `Sin conexión · último estado: ${statusText}`;
+      statusText = "SIN CONEXIÓN";
+      statusColor = "var(--gray-accent)";
+      statusRawColor = "#64748b";
+      statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.58 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>';
     }
 
     let signalQuality = "Débil";
@@ -3190,7 +3208,7 @@ function updateValoresEnVivo() {
           <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600;">
             ESTADO DE CERCOS:
           </div>
-          <div style="display: flex; gap: 6px;">
+          <div style="display: flex; gap: 6px; ${isOnline ? '' : 'opacity: 0.5;'}">
     `;
 
     for (let i = 1; i <= 5; i++) {
@@ -3283,7 +3301,7 @@ function showSingleChipControl(chipId) {
   if (device.alarm) {
     statusColor = "var(--red)"; statusRawColor = "#ef4444";
     statusText = "ALARMA ACTIVA"; statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-  } else if (device.intrusion) {
+  } else if (device.intrusion || [1, 2, 3, 4, 5].some((i) => sensors[`c${i}`])) {
     statusColor = "var(--amber)"; statusRawColor = "#f59e0b";
     statusText = "INTRUSIÓN"; statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   } else if (device.armed) {
