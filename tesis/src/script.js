@@ -3117,6 +3117,7 @@ function updateValoresEnVivo() {
     const deviceName = device.name || chipId;
 
     let statusColor = "var(--gray-accent)";
+    let statusRawColor = "#64748b";
     let statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 019.9-1"/></svg>';
     let statusText = "DESCONOCIDO";
     let statusDesc = "Estado no disponible";
@@ -3126,21 +3127,25 @@ function updateValoresEnVivo() {
 
     if (hasAlarm) {
       statusColor = "var(--red)";
+      statusRawColor = "#ef4444";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
       statusText = "ALARMA ACTIVA";
       statusDesc = "¡Se requiere atención inmediata!";
     } else if (hasActiveSensors) {
       statusColor = "var(--amber)";
+      statusRawColor = "#f59e0b";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
       statusText = "INTRUSIÓN";
       statusDesc = "Intrusión detectada";
     } else if (sensors.armado || device.armed) {
       statusColor = "var(--green)";
+      statusRawColor = "#22c55e";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7z"/></svg>';
       statusText = "ARMADO";
       statusDesc = "Sistema vigilando";
     } else {
       statusColor = "var(--gray-accent)";
+      statusRawColor = "#64748b";
       statusIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 019.9-1"/></svg>';
       statusText = "DESARMADO";
       statusDesc = "Sistema inactivo";
@@ -3171,10 +3176,10 @@ function updateValoresEnVivo() {
         <div style="text-align: center; margin: 20px 0;">
           <div style="
             width: 90px; height: 90px; border-radius: 50%;
-            background: linear-gradient(135deg, ${statusColor}, ${statusColor}80);
+            background: linear-gradient(135deg, ${statusRawColor}, ${statusRawColor}80);
             margin: 0 auto;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 6px 20px ${statusColor}40;
+            box-shadow: 0 6px 20px ${statusRawColor}40;
           ">
             <span style="color: white; font-size: 36px;">${statusIcon}</span>
           </div>
@@ -3185,7 +3190,7 @@ function updateValoresEnVivo() {
           <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600;">
             ESTADO DE CERCOS:
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 6px;">
+          <div style="display: flex; gap: 6px;">
     `;
 
     for (let i = 1; i <= 5; i++) {
@@ -3193,7 +3198,7 @@ function updateValoresEnVivo() {
       const isActive = sensors[`c${i}`] || false;
       html += `
         <div style="
-          flex: 1; padding: 10px 0; border-radius: 8px;
+          flex: 1; min-width: 0; padding: 10px 0; border-radius: 8px;
           background: ${isActive ? 'var(--red)' : 'var(--green)'};
           color: white; text-align: center; font-weight: bold; font-size: 13px;
         " title="${getZoneName(chipId, `c${i}`)}: ${isActive ? 'ACTIVO' : 'NORMAL'}">
